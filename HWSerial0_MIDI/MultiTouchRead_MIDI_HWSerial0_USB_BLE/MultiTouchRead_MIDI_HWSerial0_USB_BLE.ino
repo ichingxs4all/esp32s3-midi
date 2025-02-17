@@ -1,4 +1,4 @@
-// Example for reading the touchpins of a Xiao ESP32S3 module and sending it out as MIDI notes through USB
+// Example for reading the touchpins of a Xiao ESP32S3 module and sending it out as MIDI notes through USB and Hardware Serial port 0
 // Adapted for use with the 'MIDI Madness Maker' from Michelle Vossen & Veerle Pennock https://v0ss3n.github.io/midimadness/
 // All code below is inspired and constructed from examples of the libraries that are used.
 //
@@ -21,13 +21,19 @@
 #include "MegunoLink.h"
 #include "Filter.h"            
 
+#include <BLEMIDI_Transport.h> //BLE-MIDI library
+#include <hardware/BLEMIDI_ESP32_NimBLE.h>  //Take version 1.4.3 !!
+
 // USB MIDI object
 Adafruit_USBD_MIDI usb_midi;
 
 // Create a new instance of the Arduino MIDI Library,
 // and attach usb_midi as the transport.
-//MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
-MIDI_CREATE_INSTANCE(HardwareSerial, Serial0, MIDI); // Hardware Serial port 0  ( TX pin GPIO43, RX pin GPIO44 on Xiao ESP32S3)
+MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, USBMIDI);
+//And also attach it to the hardware serial port 0
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial0, HWMIDI); // Hardware Serial port 0  ( TX pin GPIO43, RX pin GPIO44 on Xiao ESP32S3)
+//Create a new instance of the BLE MIDI library
+BLEMIDI_CREATE_INSTANCE("BLE-MIDI", BLEMIDI)
 
 // the MIDI channel number to send messages
 uint8_t const channel = 1;      // The Midi channel we are sending to
@@ -60,6 +66,7 @@ ExponentialFilter<long> TouchFilter7(10, 0);
 ExponentialFilter<long> TouchFilter8(10, 0);
 ExponentialFilter<long> TouchFilter9(10, 0);
 
+bool toggle = false;          //A little bool to toggle the led
 
 bool debug = false;           // Set this to TRUE to enable some debugging info on the serial console
 
@@ -69,7 +76,12 @@ bool enableVelocity = true;  // Set this to FALSE if you need a FIXED velocity o
 
 uint8_t velocity = 100;          // Max velocity for the fixed value
 
-bool toggle = false;
+
+
+const bool enabledHWMIDI = true;  //Set to FALSE to disable hardware serial port MIDI
+const bool enabledUSBMIDI = false; //Set to FALSE to disable USB MIDI
+const bool enabledBLEMIDI = false; //Set to FALSE to disable BLE MIDI
+
 
 void setup() {
   //If you connect pin D2 / GPIO3 ( T2 on the MIDI Madness Maker) to 3V3 on the board while starting you can enable debug mode and some debug info is send to the serial console
@@ -90,9 +102,12 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);     //Define the builtin led port as output
   digitalWrite(LED_BUILTIN, HIGH);  //Turn it off...yes...the led is wired such a way that is ON when set LOW and viceversa
 
+
   // Initialize MIDI, and listen to all MIDI channels
   // This will also call usb_midi's begin()
-  MIDI.begin(MIDI_CHANNEL_OMNI);
+  if(enabledHWMIDI)  USBMIDI.begin(MIDI_CHANNEL_OMNI);
+  if(enabledUSBMIDI) HWMIDI.begin(MIDI_CHANNEL_OMNI);
+  if(enabledBLEMIDI) BLEMIDI.begin(MIDI_CHANNEL_OMNI);
 
   // If already enumerated, additional class driverr begin() e.g msc, hid, midi won't take effect until re-enumeration
   if (TinyUSBDevice.mounted()) {
@@ -103,7 +118,7 @@ void setup() {
 
   delay(1000);  //Wait a second for the USB stack to come up
 
-  calibrateTouchPins();  //Do the calibartion of the touch pins ....do not touch the pins while calibrating !
+  calibrateTouchPins();  //Do the calibration of the touch pins ....do not touch the pins while calibrating !
 }
 
 void loop() {
@@ -123,7 +138,9 @@ void loop() {
     filterTouch( i, touch[i]); // Filter the touch value
 
     if(touchLastCC[i] > 0 ){ //If the mapped CC value is greater then 0 send it
-    MIDI.sendControlChange(touchCC[i], touchLastCC[i], channel); //Send the message
+    if(enabledUSBMIDI) USBMIDI.sendControlChange(touchCC[i], touchLastCC[i], channel); //Send the message
+    if(enabledHWMIDI) HWMIDI.sendControlChange(touchCC[i], touchLastCC[i], channel); //Send the message
+    if(enabledBLEMIDI) BLEMIDI.sendControlChange(touchCC[i], touchLastCC[i], channel); //Send the message
     toggle = !toggle;  //A little toggle to let the led flash while sending messages
     digitalWrite(LED_BUILTIN, toggle);
     }
@@ -137,12 +154,16 @@ void loop() {
     if(enableNote){ //Send notes if enabled
 
     if (touch[i] > (touchBaseLine[i] + touchTreshold[i]) && touchon[i] == 0) {  //If the last read value is above treshold play the according  midi note if not already triggered
-      MIDI.sendNoteOn(touchpitch[i], velocity, channel);                        //
+      if(enabledUSBMIDI) USBMIDI.sendNoteOn(touchpitch[i], velocity, channel); 
+      if(enabledHWMIDI) HWMIDI.sendNoteOn(touchpitch[i], velocity, channel);                       //
+      if(enabledBLEMIDI) BLEMIDI.sendNoteOn(touchpitch[i], velocity, channel);
       digitalWrite(LED_BUILTIN, LOW);
       touchon[i] = 1;
     }
     if (touch[i] < (touchBaseLine[i] + touchTreshold[i]) && touchon[i] == 1) {  //If the last read value is below treshold stop playing the according  midi note if not already triggered
-      MIDI.sendNoteOff(touchpitch[i], 0, channel);
+      if(enabledUSBMIDI) USBMIDI.sendNoteOff(touchpitch[i], 0, channel);
+      if(enabledHWMIDI) HWMIDI.sendNoteOff(touchpitch[i], 0, channel);
+      if(enabledBLEMIDI) BLEMIDI.sendNoteOff(touchpitch[i], 0, channel);
       digitalWrite(LED_BUILTIN, HIGH);
       touchon[i] = 0;
     }
@@ -152,7 +173,9 @@ void loop() {
   if (debug) Serial.println();  //Just a newline after all readings
 
   // i think if you remove these last two lines everything breaks and things are sad and people cry
-  MIDI.read();  // read and discard any incoming MIDI messages
+  if(enabledUSBMIDI) USBMIDI.read();  // read and discard any incoming MIDI messages
+  if(enabledHWMIDI) HWMIDI.read();  // read and discard any incoming MIDI messages
+  if(enabledBLEMIDI) BLEMIDI.read();  // read and discard any incoming MIDI messages
   delay(10);
 }
 

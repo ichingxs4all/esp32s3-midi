@@ -69,17 +69,19 @@ ExponentialFilter<long> TouchFilter9(10, 0);
 
 bool debug = false;           // Set this to TRUE to enable some debugging info on the serial console
 
+bool toggle = false;          // A little bool to toggle the led
+
 bool enableNote = true;       //Set this to FALSE if you want to disable Note messages
 bool enableCC = true;         // Set this to FALSE if you want to disable Control Change Messages
 bool enableVelocity = true;  // Set this to FALSE if you need a FIXED velocity on the played notes
 
 uint8_t velocity = 100;          // Max velocity for the fixed value
 
-bool toggle = false;
 
-bool enabledHWMIDI = true;  //Set to FALSE to disable hardware serial port MIDI
-bool enabledUSBMIDI = true; //Set to FALSE to disable USB MIDI
-bool enabledBLEMIDI = true; //Set to FALSE to disable BLE MIDI
+
+const bool enabledHWMIDI = false;  //Set to FALSE to disable hardware serial port MIDI
+const bool enabledUSBMIDI = false; //Set to FALSE to disable USB MIDI
+const bool enabledBLEMIDI = true; //Set to FALSE to disable BLE MIDI
 
 
 void setup() {
