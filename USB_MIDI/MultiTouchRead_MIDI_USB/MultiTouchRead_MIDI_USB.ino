@@ -21,12 +21,13 @@
 #include "MegunoLink.h"
 #include "Filter.h"            
 
-// USB MIDI object/Users/mragutli/Documents/GitHub/midimadness/Arduino (code)/MIDI_madness_tone_bleeps_with-variable-capacitance/pitches.h
+// USB MIDI object
 Adafruit_USBD_MIDI usb_midi;
 
 // Create a new instance of the Arduino MIDI Library,
 // and attach usb_midi as the transport.
-MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
+//MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
+MIDI_CREATE_INSTANCE(HardwareSerial, Serial0, MIDI); // Hardware Serial port 0  ( TX pin GPIO43, RX pin GPIO44 on Xiao ESP32S3)
 
 // the MIDI channel number to send messages
 uint8_t const channel = 1;      // The Midi channel we are sending to
